@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+from datetime import date
 load_dotenv()
 
 import json
@@ -6,6 +7,13 @@ import anthropic
 
 client = anthropic.Anthropic()
 MODEL = "claude-sonnet-5-5"
+
+def days_until(target_date: str) -> str:
+    try:
+        target = date.fromisoformat(target_date)
+    except ValueError:
+        return "ERROR: дата должна быть в формате ГГГГ-ММ-ДД"
+    return str((target - date.today()).days)
 
 
 def get_text(response):
@@ -73,6 +81,7 @@ TOOL_FUNCS = {
     "get_exchange_rate": get_exchange_rate,
     "calculate": calculate,
     "get_weather": get_weather,
+    "days_until": days_until,
 }
 
 tools = [
@@ -107,6 +116,18 @@ tools = [
                 "city": {"type": "string", "description": "Название города на английском, например London"},
             },
             "required": ["city"],
+        },
+        
+    },
+        {
+        "name": "days_until",
+        "description": "Сколько дней осталось от сегодняшнего дня до указанной даты.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "target_date": {"type": "string", "description": "Дата в формате ГГГГ-ММ-ДД"},
+            },
+            "required": ["target_date"],
         },
     },
 ]
