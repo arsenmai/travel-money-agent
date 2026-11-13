@@ -1,5 +1,4 @@
 from dotenv import load_dotenv
-from datetime import date
 load_dotenv()
 
 import json
@@ -7,13 +6,6 @@ import anthropic
 
 client = anthropic.Anthropic()
 MODEL = "claude-sonnet-5-5"
-
-def days_until(target_date: str) -> str:
-    try:
-        target = date.fromisoformat(target_date)
-    except ValueError:
-        return "ERROR: дата должна быть в формате ГГГГ-ММ-ДД"
-    return str((target - date.today()).days)
 
 
 def get_text(response):
@@ -81,7 +73,6 @@ TOOL_FUNCS = {
     "get_exchange_rate": get_exchange_rate,
     "calculate": calculate,
     "get_weather": get_weather,
-    "days_until": days_until,
 }
 
 tools = [
@@ -117,18 +108,6 @@ tools = [
             },
             "required": ["city"],
         },
-        
-    },
-        {
-        "name": "days_until",
-        "description": "Сколько дней осталось от сегодняшнего дня до указанной даты.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "target_date": {"type": "string", "description": "Дата в формате ГГГГ-ММ-ДД"},
-            },
-            "required": ["target_date"],
-        },
     },
 ]
 
@@ -137,10 +116,11 @@ SYSTEM = "Для любых вычислений всегда используй
 
 # ---------- ЦИКЛ АГЕНТА ----------
 
-def run_agent(task: str, max_steps: int = 10, on_step=None) -> str:
+def run_agent(task: str, max_steps: int = 10, on_step=None, history=None) -> str:
     """on_step — необязательная функция, которую вызываем после каждого инструмента
-    (её передаёт интерфейс, чтобы показывать шаги агента вживую)."""
-    messages = [{"role": "user", "content": task}]
+    (её передаёт интерфейс, чтобы показывать шаги агента вживую).
+    history — предыдущие реплики диалога [{"role": "user"/"assistant", "content": "текст"}, ...]."""
+    messages = list(history or []) + [{"role": "user", "content": task}]
 
     for step in range(1, max_steps + 1):
         response = client.messages.create(
