@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Travel Money Agent</title>
+
+  <!-- Библиотеки для отображения Markdown-ответа модели (и его очистки от опасного HTML) -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+
+  <!-- ===== CSS: как всё выглядит ===== -->
+  <style>
+    /* НОВОЕ: новая палитра — тёмно-изумрудная с янтарным акцентом.
+       Поменяй значения здесь, и цвета изменятся на всей странице. */
+    :root {
+      --bg: #0b1412;
+      --card: #12201d;
+      --border: #22362f;
+      --text: #e6f2ee;
+      --muted: #8aa69c;
+      --accent: #f2a541;
+      --accent-hover: #e0922c;
+      --ok: #3ecf8e;
+      --err: #ff6b6b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 48px 20px 80px; }
+    h1 { font-size: 2rem; margin: 0 0 6px; }
+    .subtitle { color: var(--muted); margin: 0 0 28px; }
+
+    .examples { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .chip {
+      background: var(--card); border: 1px solid var(--border); color: var(--text);
+      padding: 8px 12px; border-radius: 999px; cursor: pointer; font-size: 0.88rem;
+    }
+    .chip:hover { border-color: var(--accent); }
+
+    textarea {
+      width: 100%; min-height: 96px; resize: vertical;
+      background: var(--card); color: var(--text);
+      border: 1px solid var(--border); border-radius: 12px;
+      padding: 14px; font: inherit;
+    }
+    textarea:focus { outline: none; border-color: var(--accent); }
+
+    .row { display: flex; align-items: center; gap: 14px; margin-top: 12px; }
+    button.primary {
+      background: var(--accent); border: 0;
+      padding: 11px 20px; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 1rem;
+      color: #1a1205;  /* тёмный текст лучше читается на янтарной кнопке */
+    }
+    button.primary:hover { background: var(--accent-hover); }
+    button.primary:disabled { opacity: 0.5; cursor: wait; }
+    .hint { color: var(--muted); font-size: 0.85rem; }
+
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 18px 20px; margin-top: 22px;
+    }
+    .card h2 { font-size: 1rem; margin: 0 0 12px; color: var(--muted); font-weight: 600; }
+    .hidden { display: none; }
+
+    .step {
+      display: flex; gap: 10px; padding: 8px 0;
+      border-top: 1px solid var(--border); font-size: 0.9rem;
+    }
+    .step:first-of-type { border-top: 0; }
+    .step .num { color: var(--accent); font-weight: 700; min-width: 54px; }
+    .step code {
+      font-family: ui-monospace, Menlo, monospace; font-size: 0.82rem;
+      background: #11141a; padding: 2px 6px; border-radius: 6px; word-break: break-all;
+    }
+    .step .arrow { color: var(--muted); margin: 0 4px; }
+
+    .stats { display: flex; gap: 28px; margin-top: 14px; color: var(--muted); font-size: 0.88rem; }
+    .stats b { color: var(--text); font-size: 1.2rem; display: block; }
+
+    #answer table { border-collapse: collapse; margin: 10px 0; }
+    #answer th, #answer td { border: 1px solid var(--border); padding: 6px 10px; }
+    .error { color: var(--err); }
+
+    .spinner {
+      width: 16px; height: 16px; border: 2px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.8s linear infinite; display: inline-block; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .tools { display: flex; flex-wrap: wrap; gap: 6px; margin: -14px 0 24px; }
+    .tool-badge {
+      font-size: 0.78rem; color: var(--muted);
+      border: 1px dashed var(--border); border-radius: 6px; padding: 3px 8px; cursor: help;
+    }
+
+    footer { margin-top: 40px; color: var(--muted); font-size: 0.8rem; }
+    footer a { color: var(--muted); }
+  </style>
+</head>
+
+<body>
+  <!-- ===== HTML: структура страницы ===== -->
+  <div class="wrap">
+    <h1>✈️ Travel Money Agent</h1>
+    <p class="subtitle">Курсы валют, погода и расчёты. Агент сам решает, какие инструменты вызвать.</p>
+
+    <!-- НОВОЕ: сюда подгружаются инструменты агента из GET /tools -->
+    <div class="tools" id="tools"></div>
+
+    <div class="examples" id="examples"></div>
+
+    <textarea id="task" placeholder="Например: где сейчас теплее, в Токио или в Нью-Йорке?"></textarea>
+
+    <div class="row">
+      <button class="primary" id="askBtn">Запустить агента</button>
+      <span class="hint">Cmd + Enter</span>
+      <span id="status" class="hint"></span>
+    </div>
+
+    <div class="card hidden" id="stepsCard">
+      <h2>Шаги агента</h2>
+      <div id="steps"></div>
+      <div class="stats" id="stats"></div>
+    </div>
+
+    <div class="card hidden" id="answerCard">
+      <h2>Ответ</h2>
+      <div id="answer"></div>
+    </div>
+
+    <footer>
+      Данные: <a href="https://www.exchangerate-api.com" target="_blank">Rates By Exchange Rate API</a> ·
+      <a href="https://open-meteo.com" target="_blank">Weather by Open-Meteo</a>
+    </footer>
+  </div>
+
+  <!-- ===== JavaScript: поведение и общение с бэкендом ===== -->
+  <script>
+    const EXAMPLES = [
+      "Сколько тенге я получу за 250 фунтов?",
+      "Я лечу из Лондона в Алматы и меняю 300 фунтов. Сколько получу и какая разница температур?",
+      "Где сейчас теплее: в Токио или в Нью-Йорке? И сколько иен стоят 50 долларов?",
+    ];
+    const ICONS = { get_exchange_rate: "💱", get_weather: "🌦️", calculate: "🧮" };
+
+    const $ = (id) => document.getElementById(id);
+
+    // Кнопки-примеры
+    for (const ex of EXAMPLES) {
+      const chip = document.createElement("button");
+      chip.className = "chip";
+      chip.textContent = ex.length > 42 ? ex.slice(0, 42) + "…" : ex;
+      chip.onclick = () => { $("task").value = ex; $("task").focus(); };
+      $("examples").appendChild(chip);
+    }
+
+    // НОВОЕ: при загрузке страницы спрашиваем у бэкенда, какие инструменты есть у агента
+    async function loadTools() {
+      try {
+        const res = await fetch("/tools");
+        const tools = await res.json();
+        for (const t of tools) {
+          const badge = document.createElement("span");
+          badge.className = "tool-badge";
+          badge.textContent = `${ICONS[t.name] || "🔧"} ${t.name}`;
+          badge.title = t.description;   // описание видно при наведении мыши
+          $("tools").appendChild(badge);
+        }
+      } catch (e) {
+        // Если эндпоинт недоступен — просто не показываем блок, страница работает дальше
+      }
+    }
+    loadTools();
+
+    // Безопасно превращаем Markdown модели в HTML
+    function renderMarkdown(text) {
+      if (window.marked && window.DOMPurify) {
+        return DOMPurify.sanitize(marked.parse(text));
+      }
+      // Если библиотеки не загрузились (нет интернета) — показываем как обычный текст
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML.replace(/\n/g, "<br>");
+    }
+
+    function renderSteps(steps) {
+      $("steps").innerHTML = "";
+      for (const s of steps) {
+        const row = document.createElement("div");
+        row.className = "step";
+
+        const num = document.createElement("span");
+        num.className = "num";
+        num.textContent = `${ICONS[s.tool] || "🔧"} ${s.step}`;
+
+        const body = document.createElement("span");
+        const call = document.createElement("code");
+        call.textContent = `${s.tool}(${JSON.stringify(s.args)})`;   // textContent = без риска XSS
+        const arrow = document.createElement("span");
+        arrow.className = "arrow";
+        arrow.textContent = "→";
+        const res = document.createElement("code");
+        res.textContent = s.result;
+
+        body.append(call, arrow, res);
+        row.append(num, body);
+        $("steps").appendChild(row);
+      }
+    }
+
+    async function ask() {
+      const task = $("task").value.trim();
+      if (!task) return;
+
+      $("askBtn").disabled = true;
+      $("status").innerHTML = '<span class="spinner"></span> Агент думает…';
+      $("stepsCard").classList.add("hidden");
+      $("answerCard").classList.add("hidden");
+      const started = performance.now();
+
+      try {
+        // ВОТ ОНО: фронтенд отправляет HTTP-запрос на наш бэкенд
+        const res = await fetch("/ask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ task }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          // FastAPI кладёт текст ошибки в поле detail
+          throw new Error(typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail));
+        }
+
+        const seconds = ((performance.now() - started) / 1000).toFixed(1);
+
+        renderSteps(data.steps);
+        const toolsUsed = new Set(data.steps.map((s) => s.tool)).size;
+        $("stats").innerHTML =
+          `<div><b>${data.steps.length}</b>вызовов</div>` +
+          `<div><b>${toolsUsed}</b>инструментов</div>` +
+          `<div><b>${seconds} с</b>время</div>`;
+        if (data.steps.length) $("stepsCard").classList.remove("hidden");
+
+        $("answer").innerHTML = renderMarkdown(data.answer);
+        $("answerCard").classList.remove("hidden");
+        $("status").textContent = "";
+      } catch (err) {
+        $("answer").innerHTML = "";
+        const p = document.createElement("p");
+        p.className = "error";
+        p.textContent = "Ошибка: " + err.message;
+        $("answer").appendChild(p);
+        $("answerCard").classList.remove("hidden");
+        $("status").textContent = "";
+      } finally {
+        $("askBtn").disabled = false;
+      }
+    }
+
+    $("askBtn").onclick = ask;
+    $("task").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ask();
+    });
+  </script>
+</body>
+</html>
