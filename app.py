@@ -11,6 +11,26 @@ from agent_loop import run_agent
 
 st.set_page_config(page_title="Travel Money Agent", page_icon="✈️")
 
+# ---------- НОВОЕ: простой пароль на вход ----------
+# Публичный сайт = каждый посетитель тратит твой баланс Claude.
+# Пароль берём из переменной окружения APP_PASSWORD:
+#   - на Streamlit Cloud — из раздела Secrets (корневые секреты становятся переменными окружения)
+#   - локально — можно добавить строку APP_PASSWORD=... в .env, или не добавлять, и пароля не будет
+import os
+
+APP_PASSWORD = os.environ.get("APP_PASSWORD")
+
+if APP_PASSWORD and not st.session_state.get("authed"):
+    st.title("✈️ Travel Money Agent")
+    pw = st.text_input("Пароль", type="password")
+    if st.button("Войти"):
+        if pw == APP_PASSWORD:
+            st.session_state.authed = True
+            st.rerun()
+        else:
+            st.error("Неверный пароль")
+    st.stop()  # дальше страница не рисуется, пока не введён пароль
+
 # Плюшка 1: история запросов, которая живёт между перезапусками скрипта
 if "history" not in st.session_state:
     st.session_state.history = []
